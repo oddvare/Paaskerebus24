@@ -82,6 +82,35 @@ const char index_html[] PROGMEM = R"rawliteral(
   </body></html>
   )rawliteral";
 
+void setupServer(){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send_P(200, "text/html", index_html);
+      Serial.println("Client Connected");
+  });
+
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+      String inputMessage;
+      String inputParam;
+
+      if (request->hasParam("name")) {
+        inputMessage = request->getParam("name")->value();
+        inputParam = "name";
+        user_name = inputMessage;
+        Serial.println(inputMessage);
+        name_received = true;
+      }
+
+      // if (request->hasParam("proficiency")) {
+      //   inputMessage = request->getParam("proficiency")->value();
+      //   inputParam = "proficiency";
+      //   proficiency = inputMessage;
+      //   Serial.println(inputMessage);
+      //   proficiency_received = true;
+      // }
+      request->send(200, "text/html", "The answer entered by you have been evaluated, if correct greeen light and box is open <br><a href=\"/\">Try Again</a>");
+  });
+}
+
 void setup() {
   
   //your other setup stuff...
