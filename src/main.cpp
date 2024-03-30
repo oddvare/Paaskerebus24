@@ -31,11 +31,11 @@ HardwareSerial gpsSerial(1);
 TinyGPSPlus gps;
 
 //======our target
-//const float pos_lat =59.3528644;
-//const float pos_long =5.2192641;
+const float pos_lat =59.3528644;
+const float pos_long =5.2192641;
 //=====test target  
-const float pos_lat = 59.400607;
-const float pos_long = 5.2833096;
+//const float pos_lat = 59.400607;
+//const float pos_long = 5.2833096;
 
 // put function declarations here:
 int myFunction(int, int);
@@ -71,62 +71,52 @@ const char index_html[] PROGMEM = R"rawliteral(
   Cu
   <br><br>
   Zweiter Hinweis:
-  NY
+  New York
     <br><br>
   Dritter Hinweis:
-  Kolhusvegen 116
-  <h4>Distance to target:</h4>
+  
+<br><br>
+
+  Wer Fahren wir?
+  <br><br>
+  <h4>Entfernung zum ziel:</h4>
   wenn der erste LED grün ist, hat der GPS einen Fix, sonst blinkt der erste LED langsam rot
   <table> 
-  <tr>
-  <th>Distance (km)</th>  
-  <th>Course to target</th> 
-  </tr>  
   <tr>  
   <td>
-    <script>
-      document.write(distanceKm.toFixed(2));
-    </script>
+    <p>Latitude: <span id="latitude"></span></p>
+    <p>Longitude: <span id="longitude"></span></p>
+    <p>Distance to target [km]: <span id="distance"></span></p>
+    <p>Heading: <span id="heading"></span></p>
+
   </td>
   <td>
     <script>
-      document.write(courseTo.toFixed(2));    
+    setInterval(function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/data", true);
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+            var data = JSON.parse(xhr.responseText);
+            document.getElementById("latitude").textContent = data.latitude;
+            document.getElementById("longitude").textContent = data.longitude;
+            document.getElementById("distance").textContent = data.distance;
+            document.getElementById("heading").textContent = data.heading;
+        }
+    }
+    xhr.send();
+}, 1000); 
     </script>
   </td>
   </tr>
   </table>
   <br><br>
-  <h4>GPS Coordinates:</h4>
-  <table> 
-  <tr>
-  <th>Latitude</th>  
-  <th>Longitude</th> 
-  </tr>  
-  <tr>  
-  <td>
-    <script>
-      document.write(gps.location.lat().toFixed(6));
-    </script>
-  </td>
-  <td>
-    <script>
-      document.write(gps.location.lng().toFixed(6));    
-    </script>
-  </td>
-  </tr>
-  </table>
-  <pre>
-  <h4>Hint:</h4>
-  <ul>  
-  <li>Cu</li>
-  <li>NY</li>
-  <li>Kolhusvegen 116</li>
-  </ul>
-
-
-  </pre>  
-  <button onclick="window.location.href='/hint'">Check location</button>
-  <button onclick="window.location.href='/hint'">Get hint</button>
+<br><br>
+<br><br>
+<br><br>
+<br><br>
+<br><br>
+<br><br>
   <br><br>
 <hr> <!-- Dividing line -->
   <br><br> <!-- Whitespace -->
@@ -156,6 +146,8 @@ public:
   }
 };
 
+
+
 void setupServer(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
       request->send_P(200, "text/html", index_html);
@@ -173,17 +165,31 @@ void setupServer(){
         Serial.println(inputMessage);
         name_received = true;
       }
-
-      // if (request->hasParam("proficiency")) {
-      //   inputMessage = request->getParam("proficiency")->value();
-      //   inputParam = "proficiency";
-      //   proficiency = inputMessage;
-      //   Serial.println(inputMessage);
-      //   proficiency_received = true;
-      // }
       request->send(200, "text/html", "The answer entered by you have been evaluated, if correct greeen light and box is open <br><a href=\"/\">Try Again</a>");
   });
+    server.on("/data", HTTP_GET, [] (AsyncWebServerRequest *request) {
+      String json = "{";
+      json += "\"latitude\": " + String(gps.location.lat(), 6) + ",";
+      json += "\"longitude\": " + String(gps.location.lng(), 6) + ",";
+      // Replace distanceTo and heading with your actual variables
+      json += "\"distance\": " + String(gps.distanceBetween(gps.location.lat(),gps.location.lng(),pos_lat,pos_long) / 1000.0, 2) + ",";
+      json += "\"heading\": " + String(gps.courseTo(gps.location.lat(),gps.location.lng(),pos_lat,pos_long), 2);
+      json += "}";
+      request->send(200, "application/json", json);
+  });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = index_html;
+    html.replace("id=\"latitude\"", "id=\"latitude\">" + String(gps.location.lat(), 6));
+    html.replace("id=\"longitude\"", "id=\"longitude\">" + String(gps.location.lng(), 6));
+    // Replace distanceTo and heading with your actual variables
+    html.replace("id=\"distance\"", "id=\"distance\">" + String(gps.distanceBetween(gps.location.lat(),gps.location.lng(),pos_lat,pos_long) / 1000.0, 2));
+    html.replace("id=\"heading\"", "id=\"heading\">" + String(gps.cardinal(gps.courseTo(gps.location.lat(),gps.location.lng(),pos_lat,pos_long))));
+    request->send(200, "text/html", html);
+});
 }
+
+
+
 
 void setup() {
   
@@ -247,20 +253,22 @@ if (millis() > 5000 && gps.charsProcessed() < 10) // uh oh
   dnsServer.processNextRequest();
   if(name_received){
       Serial.print("Hello ");Serial.println(user_name);
-      if(user_name=="Askeladden"){
-        Serial.println("Grønt lys");
-        fill_solid(leds,5,CRGB::Green);FastLED.show();
-        myservo.write(10);
+        if(user_name=="Askeladden"){
+          Serial.println("Grønt lys");
+          myservo.write(10);
+          fill_solid(leds,5,CRGB::Green);FastLED.show();
+          delay(15000);
 
-    }
-      else{fill_solid(leds,5,CRGB::Black);FastLED.show();delay(500);
-          fill_solid(leds,5,CRGB::Red);FastLED.show();delay(500);
-          fill_solid(leds,5,CRGB::Black);FastLED.show();delay(500);
-          fill_solid(leds,5,CRGB::Red);FastLED.show();
-          myservo.write(170);
-    }
+      }
+        else{
+            fill_solid(leds,5,CRGB::Black);FastLED.show();delay(500);
+            fill_solid(leds,5,CRGB::Red);FastLED.show();delay(500);
+            fill_solid(leds,5,CRGB::Black);FastLED.show();delay(500);
+            fill_solid(leds,5,CRGB::Red);FastLED.show();
+            myservo.write(170);
+      }
 
-      name_received = false;
+        name_received = false;
 
       Serial.println("We'll wait for the next client now");
     }
@@ -297,27 +305,21 @@ Serial.print("Course to target: ");
 Serial.println(courseTo);
 Serial.print("Human directions: ");
 Serial.println(gps.cardinal(courseTo));
+//following code will be used to present the distance and course to the target on the web page
+
+
 //need to add a button to check if the user has reached the destination
 //if the user has reached the destination, the lights will turn green
 //and the servo will turn to 10 degrees
-String html = "<h4>GPS Coordinates:</h4>";
-html += "<table>";
-html += "<tr>";
-html += "<th>Latitude</th>";
-html += "<th>Longitude</th>";
-html += "</tr>";
-html += "<tr>";
-html += "<td>" + String(gps.location.lat(), 6) + "</td>";
-html += "<td>" + String(gps.location.lng(), 6) + "</td>";
-html += "</tr>";
-html += "</table>";
-request->send(200, "text/html", html);
+
+// Your existing code
+
 if (distanceKm < 0.02) {
   Serial.println("You have reached your destination!");
 
   delay(1000);
    Serial.println("grønne lys");
-   for (int i = 0; i < numLeds; i++) {
+   for (int i = 1; i < numLeds; i++) {
     leds[i] = CRGB::Green;
     myservo.write(10);
     FastLED.show();
@@ -327,13 +329,14 @@ if (distanceKm < 0.02) {
   Serial.println("You are still on your way.");
   delay(1000); 
      Serial.println("røde lys");
-   for (int i = 0; i < numLeds; i++) {
+   for (int i = 1; i < numLeds; i++) {
     leds[i] = CRGB::Red;
     myservo.write(170);
     FastLED.show();
 }
 }
 }
+
 
 // put function definitions here:
 int myFunction(int x, int y) {
