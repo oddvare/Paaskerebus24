@@ -34,8 +34,8 @@ TinyGPSPlus gps;
 const float pos_lat =59.3528644;
 const float pos_long =5.2192641;
 //=====test target  
-//const float pos_lat = 59.400607;
-//const float pos_long = 5.2833096;
+//const float pos_lat = ;
+//const float pos_long = ;
 
 // put function declarations here:
 int myFunction(int, int);
